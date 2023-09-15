@@ -1,33 +1,3 @@
-<#
-# COMPLETED OBJECTIVES
-
-Change hostname
-	Let the user chose the hostname
-	Set random hostname
-
-# OBJECTIVES
-
-Set IP
-	Allow Choosing the adapter
-	Allow choosing additional options like DNS, Gateway, etc...
-
-Create domain (Windows Server Exclusive)
-
-Join domain
-
-Create users
-	Set by user
-	Randomly
-	
-sysprep to join domain
-
-edit hosts file (PowerToys allow editing it or maybe I can open notepad with it)
-
-disable firewall
-
-#>
-
-
 param(
 	# [Switch]$Restarted # HIDED PARAMETER
 	[String]$NewComputerName
@@ -35,7 +5,7 @@ param(
 
 # START - DEFAULT VARIABLES - START
 
-$global:CURRENT_VERSION = "v0.1.0-beta"
+$global:CURRENT_VERSION = "v0.1.1-beta"
 $global:scriptName = $MyInvocation.MyCommand.Name
 
 # START - RESTART AND RESUME VARIABLES - START
@@ -47,11 +17,9 @@ $global:powershell = '"C:\Program Files\PowerShell\7\pwsh.exe"'
 
 # END - DEFAULT VARIABLES - END
 
-
-
 # START - RESTART AND RESUME SCRIPT FUNCTIONS - START
 function Test-Key([string] $path, [string] $key) {
-	return ((Test-Path $path) -and ((Get-Key $path $key) -ne $null))   
+	return ((Test-Path $path) -and ($null -ne (Get-Key $path $key)))   
 }
 function Remove-Key([string] $path, [string] $key) {
 	Remove-ItemProperty -path $path -name $key
@@ -75,7 +43,6 @@ function Clear-Any-Restart([string] $key = $global:restartKey) {
 function Restart-And-Resume([string] $parameters) {
 	Restart-And-Run $global:restartKey "$global:powershell $global:scriptFullPath `"-Restarted $parameters`""
 }
-
 # END - RESTART AND RESUME SCRIPT FUNCTIONS - END
 
 
@@ -155,9 +122,9 @@ function Test-Administrator {
 	.EXAMPLE
 	Test-Administrator
 	#>
-    $user = [System.Security.Principal.WindowsIdentity]::GetCurrent()
-    $principal = New-Object System.Security.Principal.WindowsPrincipal($user)
-    $principal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)
+	$user = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+	$principal = New-Object System.Security.Principal.WindowsPrincipal($user)
+	$principal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
 function Open-As-Admin {
@@ -167,9 +134,10 @@ function Open-As-Admin {
 	
 	if ($Arguments) {
 		
-		$p = Start-Process -FilePath "C:\Program Files\PowerShell\7\pwsh.exe" -ArgumentList "-ExecutionPolicy", "Bypass", "-File", "$global:scriptFullPath", $Arguments -Verb RunAs
-	} else { 
-		$p = Start-Process -FilePath "C:\Program Files\PowerShell\7\pwsh.exe" -ArgumentList "-ExecutionPolicy", "Bypass", "-File", "$global:scriptFullPath" -Verb RunAs
+		Start-Process -FilePath "C:\Program Files\PowerShell\7\pwsh.exe" -ArgumentList "-ExecutionPolicy", "Bypass", "-File", "$global:scriptFullPath", $Arguments -Verb RunAs
+	}
+	else {
+		Start-Process -FilePath "C:\Program Files\PowerShell\7\pwsh.exe" -ArgumentList "-ExecutionPolicy", "Bypass", "-File", "$global:scriptFullPath" -Verb RunAs
 	}
 }
 
@@ -246,7 +214,8 @@ function Test-Server {
 	if ($osInfo.Caption -match "Windows Server") {
 		return $true
 		
-	} else {
+	}
+ else {
 		
 		return $false
 	}
@@ -258,7 +227,7 @@ function Test-Server {
 # START FEATURE FUNCTIONS
 
 # START FEATURE - AUTO UPDATE - START FEATUR
-function Check-Update {
+function Get-ScriptUpdate {
 	$url = "https://raw.githubusercontent.com/Kiu1812/SystemTweaker/main/LATEST"
 	
 	$response = Invoke-RestMethod -Uri $url
@@ -276,7 +245,8 @@ function Check-Update {
 			Start-Process -FilePath "C:\Program Files\PowerShell\7\pwsh.exe" -ArgumentList "-ExecutionPolicy", "Bypass", "-File", "$outputPath", "-Update $global:scriptName" -Verb RunAs
 			exit
 		}
-	} else {
+	}
+ else {
 		Write-Host "Script is in latest version"
 	}
 }
@@ -312,13 +282,13 @@ function Set-Hostname ([String]$NewName) {
 
 
 
-function User-Menu {
+function Open-UserMenu {
 	<#
 	.SYNOPSIS
 	Shows the user menu with all its options
 	
 	.EXAMPLE
-	User-Menu
+	Open-UserMenu
 	#>
 	
 
@@ -379,7 +349,7 @@ function Main {
 		
 		if ($global:scriptName.StartsWith("tmp_")) {
 			#Start-Sleep -Seconds 1
-			$original_name = $ScriptArgs[$ScriptArgs.IndexOf("-Update")+1]
+			$original_name = $ScriptArgs[$ScriptArgs.IndexOf("-Update") + 1]
 			$scriptBlock = {
 				param($originalName, $scriptName)
 				#Start-Sleep -Seconds 2
@@ -405,7 +375,8 @@ function Main {
 		if ($global:Restarted) {
 			$Arguments = $ScriptArgs -join " "
 			Open-As-Admin $Arguments
-		} else {
+		}
+		else {
 			Write-Host "This script needs Administrator privileges"
 			
 			Confirm-Dialog -Text "Executing script as admin" -Warning
@@ -416,7 +387,7 @@ function Main {
 	}
 	# END - CHECK ADMIN PERMISSIONS - END
 	
-	Check-Update
+	Get-ScriptUpdate
 	
 	# START FEATURE - SET HOSTNAME - FEATURE START
 	if ($NewComputerName) {
@@ -430,8 +401,12 @@ function Main {
 	}
 	# END FEATURE - SET HOSTNAME - FEATURE END
 	
+	# START FEATURE - SET IP - FEATURE START
+	
+	# END FEATURE - SET IP - FEATURE END
+	
 	if (-not($global:Restarted)) {
-		User-Menu
+		Open-UserMenu
 	}
 	
 

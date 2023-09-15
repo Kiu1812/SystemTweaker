@@ -5,7 +5,7 @@ Script with System utilities for Windows machines designed to enhance system con
 
 ## PLANNED
 
-- **Configure the IP address:**
+- ***Configure the IP address:***
   - Allow the selection of the adapter
   - Allow the selection of additional options such as DNS, Gateway, etc.
 
@@ -13,7 +13,7 @@ Script with System utilities for Windows machines designed to enhance system con
 
 - ***Join the domain***
 
-- **Create system users:**
+- ***Create system users:***
   - Set data by the user
   - Randomly
 
