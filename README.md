@@ -5,10 +5,6 @@ Script with System utilities for Windows machines designed to enhance system con
 
 ## PLANNED
 
-- ***Configure the IP address:***
-  - Allow the selection of the adapter
-  - Allow the selection of additional options such as DNS, Gateway, etc.
-
 - ***Create a domain (Windows Server Exclusive)***
 
 - ***Join the domain***
@@ -23,6 +19,8 @@ Script with System utilities for Windows machines designed to enhance system con
 
 - ***Disable the firewall***
 
+- ***Always/Never***
+Add options of "Always" or "Never" to questions like "Update the Script?"
 
 ## COMPLETED
 
@@ -31,6 +29,10 @@ Script with System utilities for Windows machines designed to enhance system con
 - ***Change the hostname:***
   - Allow the user to choose the hostname
   - Set a random hostname
+
+- ***Configure the IP address:***
+  - Allows to select Network Adapter to modify
+  - Allows setting the DNS
 
 ## DETAILS
 
@@ -42,9 +44,8 @@ This feature enables the script to update itself automatically without requiring
 ### Change the hostname
 This feature provides users with the ability to change the hostname. Users can either manually choose a hostname or have the script set a random one.
 
-### Configure the IP address <sup>**</sup>
-
-This functionality will allow users to configure IP address settings, including the selection of the network adapter and additional options like DNS and Gateway settings.
+### Configure the IP address
+This functionality allows users to configure IP address settings, including the selection of the network adapter and setting a DNS
 
 ### Create a domain (Windows Server Exclusive) <sup>**</sup>
 This functionality is exclusive to Windows Server environments and aims to simplify domain setup and management tasks.
@@ -68,5 +69,7 @@ Users will have the ability to edit the hosts file using this feature. It may be
 ### Disable the firewall <sup>**</sup>
 This functionality will provide users with the ability to disable the firewall, useful for specific system configurations or network setups where firewall deactivation is necessary.
 
+### Always/Never <sup>**</sup>
+Users will have the additional options of "Always" and "Never" to some of the questions so that the script don't ask again. This will set some keys in registry to save the data.
 
 

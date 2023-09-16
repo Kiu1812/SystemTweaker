@@ -5,7 +5,7 @@ param(
 
 # START - DEFAULT VARIABLES - START
 
-$global:CURRENT_VERSION = "v0.1.1-beta"
+$global:CURRENT_VERSION = "v0.2.0-beta"
 $global:scriptName = $MyInvocation.MyCommand.Name
 
 # START - RESTART AND RESUME VARIABLES - START
@@ -79,7 +79,7 @@ function Wait-PressKey {
 function Confirm-Dialog ([String]$Text, [Switch]$Warning, [Switch]$NoExit) {
 	<#
 	.SYNOPSIS
-	Confirm dialog with custom message, defaults to abort
+	Confirm dialog with custom message, defaults to abort and exit the script
 	
 	.PARAMETER Text
 	Message to display
@@ -87,9 +87,13 @@ function Confirm-Dialog ([String]$Text, [Switch]$Warning, [Switch]$NoExit) {
 	.PARAMETER Warning
 	Display as a warning, changes the color and adds "Warning" at the beggining
 	
+	.PARAMETER NoExit
+	Continues without exiting the script
+
 	.EXAMPLE
 	Confirm-Dialog "This action will restart the machine"
 	Confirm-Dialog "This action will restart the machine" -Warning
+	Confirm-Dialog "Update needed" -Warning -NoExit
 	#>
 	
 	Write-Host ""
@@ -128,6 +132,17 @@ function Test-Administrator {
 }
 
 function Open-As-Admin {
+	<#
+	.SYNOPSIS
+	Opens script as admin passing console parameters to new launch
+	
+	.PARAMETER Arguments
+	The parameters that the script recieved
+
+	.EXAMPLE
+	Open-As-Admin
+	Open-As-Admin $ScriptArgs
+	#>
 	param (
 		[String]$Arguments
 	)
@@ -154,6 +169,9 @@ function Select-From-Options {
 	
 	.PARAMETER Options
 	Options to display
+
+	.PARAMETER CustomObject
+	Enable this if "Options" parameter is a PSCustomObject. The PSCustomObject will need to have the Index itself
 	
 	.EXAMPLE
 	Select-From-Options -Options @("Option 1","Option 2")
@@ -170,7 +188,9 @@ function Select-From-Options {
 		[String[]]$Comments,
 		
 		[Parameter(Mandatory)]
-		[String[]]$Options
+		$Options,
+
+		[Switch]$CustomObject
 	)
 	
 	Write-Host ""
@@ -187,13 +207,18 @@ function Select-From-Options {
 		}
 	}
 
-	Write-Host ""
-	foreach ($idx in 0..($Options.Length - 1)) {
-		$option = $Options[$idx]
-		
-		Write-Host "($idx) $option"
+	if (-not($CustomObject)) {
+		Write-Host ""
+		foreach ($idx in 0..($Options.Length - 1)) {
+			$option = $Options[$idx]
+			
+			Write-Host "($idx) $option"
+		}
+		Write-Host ""
 	}
-	Write-Host ""
+	else {
+		$Options | Format-Table -AutoSize | Out-Host
+	}
 	
 	$selection = Read-Host -Prompt ":"
 	
@@ -206,19 +231,168 @@ function Select-From-Options {
 	return $selection
 }
 
-function Test-Server {
-	# Obtener información del sistema operativo
+function Test-ServerEdition {
+	<#
+	.SYNOPSIS
+   	Checks if the current operating system edition is a Windows Server edition. Returns $true if its a Windows Server
+   	
+	.EXAMPLE
+	Test-ServerEdition
+	#>
 	$osInfo = Get-CimInstance -Class Win32_OperatingSystem
+	return ($osInfo.Caption -match "Windows Server")
+}
 
-	# Verificar la edición del sistema operativo
-	if ($osInfo.Caption -match "Windows Server") {
-		return $true
-		
+function Test-ValidIP {
+	<#
+	.SYNOPSIS
+	Checks if provided IP is valid
+
+	.PARAMETER IP
+	Specify the IP to check
+
+	.EXAMPLE
+	Test-ValidIP -IP "192.168.5.2"
+	#>
+
+	param (
+		[String]$IP
+	)
+
+	try {
+		[ipaddress] $IP | Out-Null
 	}
- else {
-		
-		return $false
+	catch [System.InvalidCastException] {
+		throw "Not a valid IP"
 	}
+}
+
+function Test-ValidCIDR {
+	<#
+	.SYNOPSIS
+	Checks if provided CIDR is valid
+
+	.PARAMETER CIDR
+	Specify the CIDR to check
+
+	.EXAMPLE
+	Test-ValidCIDR -CIDR "24"
+	#>
+	param (
+		[String]$CIDR
+	)
+
+	if (-not($CIDR -ge 1 -and $CIDR -le 32)) {
+		Throw "Not valid CIDR"
+	}
+}
+
+function Test-ValidSubnetMask {
+	<#
+	.SYNOPSIS
+	Checks if provided mask is valid
+
+	.PARAMETER SubnetMask
+	Specify the mask to check
+
+	.EXAMPLE
+	Test-ValidSubnetMask -SubnetMask "255.255.255.0"
+	#>
+	param (
+		[String]$SubnetMask
+	)
+
+	$octets = $SubnetMask -split '\.'
+
+	if ($octets.Length -ne 4) {
+		Throw "Not a valid subnet mask"
+	}
+
+	$binaryMask = $octets | ForEach-Object {
+		[Convert]::ToString([int]$_, 2).PadLeft(8, '0')
+	}
+
+	$binaryMask = [String]::Join('', $binaryMask)
+
+	$onesCount = $binaryMask.IndexOf('0')
+    
+	if (-not($onesCount -ne -1 -and $binaryMask.Substring($onesCount) -notmatch '1')) {
+		Throw "Not a valid subnet mask"
+	}
+}
+
+function Test-ValidIPAddressWithCIDR {
+	<#
+	.SYNOPSIS
+	Checks if provided IP is not a NetworkAddress or a BroadcastAddress with the CIDR specified
+
+	.PARAMETER IP
+	Specify the IP to check
+
+	.PARAMETER CIDR
+	Specify the CIDR to use
+
+	.EXAMPLE
+	Test-ValidIPAddressWithCIDR -IP "192.168.5.2" -CIDR "24"
+	#>
+	param (
+		[String]$IP,
+		[String]$CIDR
+	)
+
+	$IPAddressParts = $IP -split '\.'
+	$IPAddressInt = 0
+
+	for ($i = 0; $i -lt 4; $i++) {
+		$IPAddressInt = $IPAddressInt * 256 + [int]$IPAddressParts[$i]
+	}
+
+	$CIDRPrefix = [int]$CIDR
+	$NetworkAddressInt = $IPAddressInt -band ((-bnot 0) -shl (32 - $CIDRPrefix))
+	$BroadcastAddressInt = $NetworkAddressInt -bor (-bnot ((-bnot 0) -shl (32 - $CIDRPrefix)))
+
+	if ($IPAddressInt -eq $NetworkAddressInt -or $IPAddressInt -eq $BroadcastAddressInt) {
+		Throw "Not a valid combination of IP and CIDR"
+	}
+
+	if (-not($IPAddressInt -ge $NetworkAddressInt -and $IPAddressInt -le $BroadcastAddressInt)) {
+		Throw "Not a valid combination of IP and CIDR"
+	}
+}
+
+function Get-Gateway {
+	<#
+	.SYNOPSIS
+	Obtains the Gateway IP based on starting IP and CIDR
+
+	.PARAMETER IP
+	Specify the IP to use
+
+	.PARAMETER CIDR
+	Specify the CIDR to use
+
+	.EXAMPLE
+	Get-Gateway -IP "192.168.5.2" -CIDR "24"
+	#>
+	param (
+		[String]$IP,
+		[String]$CIDR
+	)
+
+	
+	$IPAddressParts = $IP -split '\.'
+	$IPAddressInt = 0
+
+	for ($i = 0; $i -lt 4; $i++) {
+		$IPAddressInt = $IPAddressInt * 256 + [int]$IPAddressParts[$i]
+	}
+
+	$CIDRPrefix = [int]$CIDR
+	$NetworkAddressInt = $IPAddressInt -band ((-bnot 0) -shl (32 - $CIDRPrefix))
+	$GatewayAddressInt = $NetworkAddressInt + 1
+
+	$GatewayAddress = [String]::Join('.', [Math]::Truncate($GatewayAddressInt / 0x1000000), [Math]::Truncate($GatewayAddressInt / 0x10000 % 256), [Math]::Truncate($GatewayAddressInt / 0x100 % 256), [Math]::Truncate($GatewayAddressInt % 256))
+	return $GatewayAddress
 }
 # END - UTIL FUNCTIONS - END
 
@@ -228,11 +402,17 @@ function Test-Server {
 
 # START FEATURE - AUTO UPDATE - START FEATUR
 function Get-ScriptUpdate {
+	<#
+	.SYNOPSIS
+	Checks if there is any new update for the script and downloads it if user wants
+
+	.EXAMPLE
+	Get-ScriptUpdate
+	#>
 	$url = "https://raw.githubusercontent.com/Kiu1812/SystemTweaker/main/LATEST"
 	
 	$response = Invoke-RestMethod -Uri $url
 	$LATEST_VERSION = $response.Split()[0]
-	#$URL = $response.Split()[1]
 	
 	if ($LATEST_VERSION -ne $global:CURRENT_VERSION) {
 		if (Confirm-Dialog "New version available ($LATEST_VERSION), will download it now. Current version: ($global:CURRENT_VERSION)" -NoExit) {
@@ -246,13 +426,53 @@ function Get-ScriptUpdate {
 			exit
 		}
 	}
- else {
-		Write-Host "Script is in latest version"
+	else {
+		Write-Host "No updates available"
 	}
 }
 # END FEATURE - AUTO UPDATE - END FEATURE
 
 # START FEATURE - SET HOSTNAME - FEATURE START
+function Set-Hostname-Dialog {
+	<#
+	.SYNOPSIS
+	Show all the options to set a new hostname
+	
+	.EXAMPLE
+	Set-Hostname-Dialog
+	#>
+	Confirm-Dialog "This function will require a system restart" -Warning
+	
+	$current_hostname = hostname
+	$selection = Select-From-Options -Title "Set Hostname" -Comments "Current hostname: $current_hostname" -Options @("Manually", "Random")
+	switch ($selection) {
+		0 {
+			# Manually
+			$NewComputerName = Read-Host -Prompt "Specify the new name"
+			Set-Hostname $NewComputerName
+		}
+		1 {
+			# Random
+			if (Test-ServerEdition) {
+				# Default
+				$prefix = "WIN-SERVER"
+			}
+			else {
+				$prefix = "WIN-DESKTOP"
+			}
+			$selection = Select-From-Options -Title "Set Random Hostname" -Options @("Default prefix [$prefix]", "Add custom prefix [`"-`" is added automatically]")
+			if ($selection -eq 1) {
+				# Custom
+				$prefix = Read-Host "Custom prefix"
+			}
+			
+			$randomHex = -join (Get-Random -InputObject (0x0..0xF) -Count 4 | ForEach-Object { '{0:X}' -f $_ })
+			$NewComputerName = "$prefix-$randomHex"
+			Confirm-Dialog "The hostname generated is $NewComputerName"
+			Set-Hostname $NewComputerName
+		}
+	}
+}
 function Set-Hostname ([String]$NewName) {
 	<#
 	.SYNOPSIS
@@ -278,6 +498,138 @@ function Set-Hostname ([String]$NewName) {
 }
 # END FEATURE - SET HOSTNAME - FEATURE END
 
+# START FEATURE - SET IP - FEATURE START
+function Set-IP-Dialog {
+	<#
+	.SYNOPSIS
+	Show all the options to set a new IP
+
+	.EXAMPLE
+	Set-IP-Dialog
+	#>
+	$NetworkAdapters = (Get-CimInstance -ClassName Win32_NetworkAdapter | Where-Object { $_.NetConnectionStatus -ge 0 -and $_.NetConnectionStatus -le 3 } | Select-Object netconnectionid, name, netconnectionstatus) | ForEach-Object { $ip = (Get-NetIPAddress -AddressFamily "IPv4" -InterfaceAlias $_.netconnectionid) ; [PSCustomObject]@{netconnectionid = $_.netconnectionid; name = $_.name; netconnectionstatus = $_.netconnectionstatus; ip = $ip } }
+	$NetworkAdaptersObjects = @()
+	foreach ($Adapter in $NetworkAdapters) {
+		$Position = "(" + $NetworkAdapters.IndexOf($Adapter) + ")"
+		$Connection_ID = $Adapter.netconnectionid
+		$Name = $Adapter.name
+		$IP = $Adapter.ip
+		
+		switch ($Adapter.NetConnectionStatus) {
+			0 {
+				$Status = "Disconnected"
+			}
+			1 {
+				$Status = "Connecting"
+			}
+			2 {
+				$Status = "Connected"
+			}
+			3 {
+				$Status = "Disconnecting"
+			}
+		}
+
+		$NetworkAdaptersObjects += [PSCustomObject]@{
+			"   "         = $Position
+			Connection_ID = $Connection_ID
+			Name          = $Name
+			Status        = $Status
+			IP            = $IP
+		}
+	}
+
+	$selection = Select-From-Options -Title "Network Adapters" -Options $NetworkAdaptersObjects -CustomObject
+	
+	$NetworkAdapter = $NetworkAdaptersObjects[$selection]
+	if ($NetworkAdapter.Status -eq "Disconnected") {
+		Confirm-Dialog -Text "This interface is disconnected, script will try to enable it." -Warning
+		Enable-NetAdapter -Name $NetworkAdapter.Connection_ID
+		Start-Sleep -Seconds 2
+		$NewStatus = (Get-CimInstance -ClassName Win32_NetworkAdapter | Where-Object { $_.NetConnectionId -eq $NetworkAdapter.Connection_ID } | Select-Object netconnectionstatus).NetConnectionStatus
+		if ($NewStatus -lt 1 -or $NewStatus -gt 2) {
+			Throw "Couldn't enable adapter, try to enable it manually and try again"
+		}
+	}
+
+	Write-Host ""
+	$NewIP = Read-Host -Prompt "New IP (Decimal or CIDR)"
+	if ($NewIP.Contains("/")) {
+		$NewIPParts = $NewIP -split "/"
+
+		$NewIP = $NewIPParts[0]
+		Test-ValidIP -IP $NewIP
+
+		$NewCIDR = $NewIPParts[1]
+		Test-ValidCIDR -CIDR $NewCIDR
+	}
+	else {
+		Test-ValidIP -IP $NewIP
+
+		$NewCIDR = Read-Host -Prompt "New Mask (Decimal or CIDR)"
+		if ($NewCIDR.Length -ge 3) {
+			Test-ValidSubnetMask -SubnetMask $NewCIDR
+			$NewCIDR = (($NewCIDR -split '\.' | ForEach-Object { [convert]::ToString([convert]::ToByte($_, 10), 2) }) -join '' -replace '0', '' | Measure-Object -Character).Characters
+		}
+		else {
+			Test-ValidCIDR -CIDR $NewCIDR
+		}
+	}
+
+	Test-ValidIPAddressWithCIDR -IP $NewIP -CIDR $NewCIDR
+	$NewGateway = Get-Gateway -IP $NewIP -CIDR $NewCIDR
+	$NewGatewayPrompt = Read-Host -Prompt "New Gateway [$NewGateway]"
+	if (-not([string]::IsNullOrEmpty($NewGatewayPrompt))) {
+		Test-ValidIP -IP $NewGatewayPrompt
+		$NewGateway = $NewGatewayPrompt
+	}
+	$InterfaceIndex = (Get-CimInstance -ClassName Win32_NetworkAdapter | Where-Object { $_.NetConnectionId -eq $NetworkAdapter.Connection_ID } | Select-Object InterfaceIndex).InterfaceIndex
+	
+	# Remove Old IP and Gateway before setting the new
+	Remove-NetIPAddress -InterfaceIndex $InterfaceIndex -Confirm:$false
+	Remove-NetRoute -InterfaceIndex $InterfaceIndex -Confirm:$false
+
+	Start-Sleep -Seconds 1
+	New-NetIPAddress -IPAddress $NewIP -PrefixLength $NewCIDR -DefaultGateway $NewGateway -InterfaceIndex $InterfaceIndex | Out-Null
+
+	# DNS OPTIONS
+	$NewDNSServerAddresses = @("", "")
+	$selection = Read-host -Prompt "Want to set DNS (Y/N) [N]"
+	if ($selection.ToUpper() -eq "Y") {
+		$NewMainDNS = "8.8.8.8"
+		$NewSecondaryDNS = "8.8.4.4"
+
+		$NewMainDNSPrompt = Read-Host -Prompt "Main DNS [8.8.8.8]`t"
+		if (-not([string]::IsNullOrEmpty($NewMainDNSPrompt))) {
+			Test-ValidIP -IP $NewMainDNSPrompt
+			$NewMainDNS = $NewMainDNSPrompt
+		}
+		$NewSecondaryDNSPrompt = Read-Host -Prompt "Secondary DNS [8.8.4.4]`t"
+		if (-not([string]::IsNullOrEmpty($NewSecondaryDNSPrompt))) {
+			Test-ValidIP -IP $NewSecondaryDNSPrompt
+			$NewSecondaryDNS = $NewSecondaryDNSPrompt
+		}
+
+		$NewDNSServerAddresses = @($NewMainDNS, $NewSecondaryDNS)
+		Set-DnsClientServerAddress -InterfaceIndex $InterfaceIndex -ServerAddresses $NewDNSServerAddresses
+	}
+	else {
+		Set-DnsClientServerAddress -InterfaceIndex $InterfaceIndex -ResetServerAddresses
+	}
+
+
+	Write-Host ""
+	Write-Host "The new configuration is:"
+	[PSCustomObject]@{
+		ADAPTER       = $NetworkAdapter.Connection_ID
+		IP            = $NewIP
+		MASK          = $NewCIDR
+		GATEWAY       = $NewGateway
+		MAIN_DNS      = $NewDNSServerAddresses[0]
+		SECONDARY_DNS = $NewDNSServerAddresses[1]
+	} | Format-Table -AutoSize
+}
+# END FEATURE - SET IP - FEATURE END
 # END FEATURE FUNCTIONS
 
 
@@ -292,45 +644,17 @@ function Open-UserMenu {
 	#>
 	
 
-	$Options = @("Exit", "Set Hostname", "WIP Set IP", "WIP Create domain", "WIP Join domain", "WIP Create Users")
+	$Options = @("Exit", "Set Hostname", "Set IP", "WIP Create domain", "WIP Join domain", "WIP Create Users")
 	$selection = Select-From-Options -Title "System Tweaker" -Options $Options
 	switch ($selection) {
 		0 {
 			Exit-PressKey
 		}
 		1 {
-			# Set Hostname
-			Confirm-Dialog "This function will require a system restart" -Warning
-			
-			$current_hostname = hostname
-			$selection = Select-From-Options -Title "Set Hostname" -Comments "Current hostname: $current_hostname" -Options @("Manually", "Random")
-			switch ($selection) {
-				0 {
-					# Manually
-					$NewComputerName = Read-Host -Prompt "Specify the new name"
-					Set-Hostname $NewComputerName
-				}
-				1 {
-					# Random
-					if (Test-Server) {
-						# Default
-						$prefix = "WIN-SERVER"
-					}
-					else {
-						$prefix = "WIN-DESKTOP"
-					}
-					$selection = Select-From-Options -Title "Set Random Hostname" -Options @("Default prefix [$prefix]", "Add custom prefix [`"-`" is added automatically]")
-					if ($selection -eq 1) {
-						# Custom
-						$prefix = Read-Host "Custom prefix"
-					}
-					
-					$randomHex = -join (Get-Random -InputObject (0x0..0xF) -Count 4 | ForEach-Object { '{0:X}' -f $_ })
-					$NewComputerName = "$prefix-$randomHex"
-					Confirm-Dialog "The hostname generated is $NewComputerName"
-					Set-Hostname $NewComputerName
-				}
-			}
+			Set-Hostname-Dialog
+		}
+		2 {
+			Set-IP-Dialog
 		}
 	}
 }
@@ -345,27 +669,21 @@ function Main {
 	clear
 
 	if (($ScriptArgs -contains '-Update') -and (Test-Administrator)) {
-		#Write-Host "El parámetro -Update se ha especificado."
-		
 		if ($global:scriptName.StartsWith("tmp_")) {
-			#Start-Sleep -Seconds 1
 			$original_name = $ScriptArgs[$ScriptArgs.IndexOf("-Update") + 1]
 			$scriptBlock = {
 				param($originalName, $scriptName)
-				#Start-Sleep -Seconds 2
 				Remove-Item -Path $originalName -Force
 				Rename-Item -Path $scriptName -NewName $originalName -Force
 				Start-Process -FilePath 'C:\Program Files\PowerShell\7\pwsh.exe' -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $originalName
 			}
 			Start-Process "C:\Program Files\PowerShell\7\pwsh.exe" -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "& { $scriptBlock }", "-originalName", $original_name, "-scriptName", $scriptName
-
 			exit
 		}
 		Exit-PressKey
 	}
 	
 	if (($ScriptArgs -contains '-Restarted') -and (Test-Administrator)) {
-		#Write-Host "El parámetro -Restarted se ha especificado."
 		$global:Restarted = $true
 		Clear-Any-Restart
 	}
@@ -401,15 +719,9 @@ function Main {
 	}
 	# END FEATURE - SET HOSTNAME - FEATURE END
 	
-	# START FEATURE - SET IP - FEATURE START
-	
-	# END FEATURE - SET IP - FEATURE END
-	
 	if (-not($global:Restarted)) {
 		Open-UserMenu
 	}
-	
-
 }
 # END - MAIN - END
 
