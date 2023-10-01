@@ -3,6 +3,8 @@ Script with System utilities for Windows machines designed to enhance system con
 
 "SystemTweaker" is a script that provides various system utilities to streamline and optimize Windows machine settings. From self-updating capabilities to hostname customization, it aims to simplify common administrative tasks. Below are the completed and planned features:
 
+---
+
 ## PLANNED
 
 - ***Create a domain (Windows Server Exclusive)***
@@ -22,6 +24,8 @@ Script with System utilities for Windows machines designed to enhance system con
 - ***Always/Never***
 Add options of "Always" or "Never" to questions like "Update the Script?"
 
+---
+
 ## COMPLETED
 
 - ***Self-update capability:*** The script can update itself automatically, ensuring it always runs the latest code and improvements.
@@ -33,6 +37,8 @@ Add options of "Always" or "Never" to questions like "Update the Script?"
 - ***Configure the IP address:***
   - Allows to select Network Adapter to modify
   - Allows setting the DNS
+
+---
 
 ## DETAILS
 
@@ -72,4 +78,9 @@ This functionality will provide users with the ability to disable the firewall, 
 ### Always/Never <sup>**</sup>
 Users will have the additional options of "Always" and "Never" to some of the questions so that the script don't ask again. This will set some keys in registry to save the data.
 
+---
 
+## REQUIREMENTS
+
+* PowerShell 7 Installed
+* Windows host
