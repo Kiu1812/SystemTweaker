@@ -1,20 +1,168 @@
 # START_FILE - parameters.ps1 - START_FILE
 
+<#
+.SYNOPSIS
+Script with System utilities for Windows machines designed to enhance system configuration and management.
+
+.DESCRIPTION
+"SystemTweaker" is a script that provides various system utilities to streamline and optimize Windows machine settings. From self-updating capabilities to hostname customization, it aims to simplify common administrative tasks.
+
+.NOTES
+File Name : system_tweaker.ps1
+Author : Kiu1812
+Version : v0.2.5-beta
+IMPORTANT: Some parameters are for internal use only and should not be used directly by users.
+
+.PARAMETER Restarted
+[INTERNAL PARAMETER] - This parameter is for internal use only and should not be used directly.
+
+.PARAMETER Update
+[INTERNAL PARAMETER] - This parameter is for internal use only and should not be used directly.
+
+
+.PARAMETER SetHostname
+    Specifies whether the script should set a new hostname for the computer.
+    When enabled, the script will rename the computer using the value provided with the "Hostname" parameter.
+
+    Type: Switch (Boolean)
+    Default Value: False
+
+.PARAMETER Hostname
+    Specifies the new hostname for the computer. This parameter is only used if "SetHostname" is set to True.
+
+    Type: String
+    Default Value: (empty)
+
+.PARAMETER SetIP
+    Specifies whether the script should set an IP Address for the computer.
+    When enabled, the script will set the new IP using the values provided with the "IP", "CIDR", etc... parameters.
+
+    Type: Switch (Boolean)
+    Default Value: False
+
+.PARAMETER IP
+    Specifies the new IP.
+    Has to be a valid IP.
+    This parameter is only used if "SetIP" is set to True.
+
+    Type: String
+    Default Value: (empty)
+
+.PARAMETER CIDR
+    Specifies the new Subnet Mask in CIDR format.
+    This parameter is only used if "SetIP" is set to True.
+
+    Type: [int]
+    Default Value: (empty)
+
+.PARAMETER Gateway
+    Specifies the new Gateway.
+    Can be a valid IP to set certain Gateway or any non valid IP value to set empty
+    This parameter is only used if "SetIP" is set to True.
+    
+    Type: String
+    Default Value: (empty)
+
+.PARAMETER InterfaceIndex
+    Specifies the Network Adapter to modify.
+    The number has to be the field "InterfaceIndex" from the "Win32_NetworkAdapter" CIM Instance.
+    Only need to set one of "InterfaceIndex" or "InterfaceName" parameters
+    This parameter is only used if "SetIP" is set to True.
+
+    Type: [int]
+    Default Value: (empty)
+
+.PARAMETER InterfaceName
+    Specifies the Network Adapter to modify.
+    The name has to be the field "Name" from the "Win32_NetworkAdapter" CIM Instance.
+    Only need to set one of "InterfaceIndex" or "InterfaceName" parameters
+    This parameter is only used if "SetIP" is set to True.
+
+    Type: String
+    Default Value: (empty)
+
+.PARAMETER MainDNS
+    Specifies the Main DNS Server.
+    Has to be a valid IP.
+    Only need to set one combination of ("MainDNS" and "SecondaryDNS") or "DNSServers".
+    This parameter is only used if "SetIP" is set to True.
+
+    Type: String
+    Default Value: (empty)
+
+.PARAMETER SecondaryDNS
+    Specifies the Secondary DNS Server.
+    Has to be a valid IP.
+    Only need to set one combination of ("MainDNS" and "SecondaryDNS") or "DNSServers".
+    This parameter is only used if "SetIP" is set to True.
+
+    Type: String
+    Default Value: (empty)
+
+.PARAMETER DNSServers
+    Specifies one or both DNS Servers.
+    Has to contain valid(s) IP(s).
+    Only need to set one combination of ("MainDNS" and "SecondaryDNS") or "DNSServers".
+    This parameter is only used if "SetIP" is set to True.
+
+    Type: String[]
+    Default Value: (empty)
+
+.EXAMPLE
+.\system_tweaker.ps1
+# INTERACTIVE MODE
+
+.EXAMPLE
+.\system_tweaker.ps1 -SetHostname -Hostname "DESKTOP-0DA3"
+# SET NEW HOSTNAME
+
+.EXAMPLE
+.\system_tweaker.ps1 -SetIP -IP 192.168.56.4 -CIDR 24 -Gateway 192.168.56.1 -InterfaceIndex 16 -DNSServers 8.8.8.8,8.8.4.4
+# SET NEW IP BY INTERFACE INDEX
+
+.EXAMPLE
+.\system_tweaker.ps1 -SetIP -IP 192.168.56.4 -CIDR 24 -Gateway 192.168.56.1 -InterfaceName "Intel(R) PRO/1000 MT Desktop Adapter #2" -DNSServers 8.8.8.8,8.8.4.4    
+# SET NEW IP BY INTERFACE NAME
+
+.LINK
+GitHub Repository: https://github.com/Kiu1812/SystemTweaker
+#>
+[CmdletBinding(DefaultParameterSetName = "Default")]
 param(
-    # [Switch]$Restarted # HIDED PARAMETER
     
-    [String]$NewComputerName,
+
+    [Parameter(ParameterSetName = "Set-Hostname")]
+    [Switch]$SetHostname,
+    [Parameter(ParameterSetName = "Set-Hostname")]
+    [String]$Hostname,
     
-    # NEW IP PARAMETERS
-    [String]$NewIP,
-    [String]$NewCIDR,
-    [String]$NewGateway,
-    [String]$InterfaceIndex,
+
+    [Parameter(ParameterSetName = "Set-IP")]
+    [Switch]$SetIP,
+    [Parameter(ParameterSetName = "Set-IP")]
+    [String]$IP,
+    [Parameter(ParameterSetName = "Set-IP")]
+    [Int32]$CIDR,
+    [Parameter(ParameterSetName = "Set-IP")]
+    [String]$Gateway,
+    [Parameter(ParameterSetName = "Set-IP")]
+    [Int32]$InterfaceIndex,
+    [Parameter(ParameterSetName = "Set-IP")]
     [String]$InterfaceName,
+    [Parameter(ParameterSetName = "Set-IP")]
     [String]$MainDNS,
+    [Parameter(ParameterSetName = "Set-IP")]
     [String]$SecondaryDNS,
-    [String[]]$DNSServers
+    [Parameter(ParameterSetName = "Set-IP")]
+    [String[]]$DNSServers,
+
+    [Parameter(ParameterSetName = "__AllParameterSets")]
+    [Switch]$Restarted,
+    
+    [Parameter(ParameterSetName = "__AllParameterSets")]
+    [String]$Update
 )
+
 
 function ParseArguments {
     <#
@@ -28,12 +176,12 @@ function ParseArguments {
 	ParseArguments -ScriptArgs "-Restarted","-NewComputerName","WIN-DESKTOP-34DE"
     #>
     param(
-        [String[]]$ScriptArgs
+        [String]$ScriptArgs
     )
 
-    if (($ScriptArgs -contains '-Update') -and (Test-Administrator)) {
+    if ($Update -and (Test-Administrator)) {
         if ($global:scriptName.StartsWith("tmp_")) {
-            $original_name = $ScriptArgs[$ScriptArgs.IndexOf("-Update") + 1]
+            $original_name = $Update
             $scriptBlock = {
                 param($originalName, $scriptName)
                 Remove-Item -Path $originalName -Force
@@ -46,100 +194,88 @@ function ParseArguments {
         Exit-PressKey
     }
 	
-    if (($ScriptArgs -contains '-Restarted') -and (Test-Administrator)) {
-        $global:Restarted = $true
+    if ($Restarted -and (Test-Administrator)) {
         Clear-Any-Restart
     }
 	
     # START - CHECK ADMIN PERMISSIONS - START
     if (-not(Test-Administrator)) {
-        if ($global:Restarted) {
-            $Arguments = $ScriptArgs -join " "
-            Open-As-Admin $Arguments
+        
+        if ($Restarted) {
+            Open-As-Admin $ScriptArgs
+
         }
         else {
             Write-Host "This script needs Administrator privileges"
-			
             Confirm-Dialog -Text "Executing script as admin" -Warning
-            $Arguments = $ScriptArgs -join " "
-            Open-As-Admin $Arguments
+            Open-As-Admin $ScriptArgs
         }
+        
         exit
     }
     # END - CHECK ADMIN PERMISSIONS - END
-		
+
     # START FEATURE - SET HOSTNAME - FEATURE START
-    if ($NewComputerName) {
-        if ($global:Restarted) {
-            Write-Host "The new computer name is" (hostname)
+    if ($SetHostname) {
+        if ($Hostname) {
+            if ($Restarted) {
+                Write-Host "The new computer name is" (hostname)
+            }
+            else {
+                Set-Hostname $Hostname
+            }
+            Exit-PressKey
         }
-        else {
-            Set-Hostname $NewComputerName
-        }
-        Exit-PressKey
     }
     # END FEATURE - SET HOSTNAME - FEATURE END
-	
+    
     # START FEATURE - SET IP - FEATURE START
-    if ($NewIP -and $NewCIDR -and $NewGateway -and ($InterfaceIndex -or $InterfaceName)) {
-        if ($DNSServers -and ($MainDNS -or $SecondaryDNS)) {
-            throw "Too many DNS specified"
-        }
-        if ($MainDNS -or $SecondaryDNS) {
-            if ($MainDNS) {
-                Test-ValidIP -IP $MainDNS
+    if ($SetIP) {
+        if ($IP -and $CIDR -and $Gateway -and ($InterfaceIndex -or $InterfaceName)) {
+            if ($DNSServers -and ($MainDNS -or $SecondaryDNS)) {
+                throw "Too many DNS specified"
             }
-            if ($SecondaryDNS) {
-                Test-ValidIP -IP $SecondaryDNS
+            if ($MainDNS -or $SecondaryDNS) {
+                $DNSServers = @($MainDNS, $SecondaryDNS)
             }
-            $DNSServers = @($MainDNS, $SecondaryDNS)
-        }
 
-        Test-ValidIP -IP $NewIP
+            if ($CIDR.Length -ge 3) {
+                $CIDR = (($CIDR -split '\.' | ForEach-Object { [convert]::ToString([convert]::ToByte($_, 10), 2) }) -join '' -replace '0', '' | Measure-Object -Character).Characters
+            }
 
-        if ($NewCIDR.Length -ge 3) {
-            Test-ValidSubnetMask -SubnetMask $NewCIDR
-            $NewCIDR = (($NewCIDR -split '\.' | ForEach-Object { [convert]::ToString([convert]::ToByte($_, 10), 2) }) -join '' -replace '0', '' | Measure-Object -Character).Characters
-        }
-        else {
-            Test-ValidCIDR -CIDR $NewCIDR
-        }
-        
-        Test-ValidIPAddressWithCIDR -IP $NewIP -CIDR $NewCIDR
-
-        Test-ValidIP -IP $NewGateway
-
-        if ($InterfaceIndex) {
-            if ($DNSServers) {
-                Set-IP -IP $NewIP -CIDR $NewCIDR -Gateway $NewGateway -InterfaceIndex $InterfaceIndex -DNSServers $DNSServers
+            if ($InterfaceIndex) {
+                if ($DNSServers) {
+                    Set-IP -IP $IP -CIDR $CIDR -Gateway $Gateway -InterfaceIndex $InterfaceIndex -DNSServers $DNSServers
+                }
+                else {
+                    Set-IP -IP $IP -CIDR $CIDR -Gateway $Gateway -InterfaceIndex $InterfaceIndex
+                }
             }
             else {
-                Set-IP -IP $NewIP -CIDR $NewCIDR -Gateway $NewGateway -InterfaceIndex $InterfaceIndex
+                if ($DNSServers) {
+                    Set-IP -IP $IP -CIDR $CIDR -Gateway $Gateway -InterfaceName $InterfaceName -DNSServers $DNSServers
+                }
+                else {
+                    Set-IP -IP $IP -CIDR $CIDR -Gateway $Gateway -InterfaceName $InterfaceName
+                }
             }
+            Exit-PressKey
         }
-        else {
-            if ($DNSServers) {
-                Set-IP -IP $NewIP -CIDR $NewCIDR -Gateway $NewGateway -InterfaceName $InterfaceName -DNSServers $DNSServers
-            }
-            else {
-                Set-IP -IP $NewIP -CIDR $NewCIDR -Gateway $NewGateway -InterfaceName $InterfaceName
-            }
+        elseif ($IP -or $CIDR -or $Gateway -or $InterfaceIndex -or $InterfaceName -or $MainDNS -or $SecondaryDNS -or $DNSServers) {
+            throw "Not enough parameters to set a new IP"
+            Exit-PressKey
         }
-        Exit-PressKey
-    }
-    elseif ($NewIP -or $NewCIDR -or $NewGateway -or $InterfaceIndex -or $InterfaceName -or $MainDNS -or $SecondaryDNS -or $DNSServers) {
-        throw "Not enough parameters to set a new IP"
-        Exit-PressKey
     }
     # END FEATURE - SET IP - FEATURE END
 }
+
 
 # END_FILE - parameters.ps1 - END_FILE
 
 # START_FILE - global_vars.ps1 - START_FILE
 
 # START - GLOBAL VARIABLES - START
-$global:CURRENT_VERSION = "v0.2.6-beta"
+$global:CURRENT_VERSION = "v0.2.5-beta"
 $global:scriptName = $MyInvocation.MyCommand.Name
 
 # START - RESTART AND RESUME VARIABLES - START
@@ -178,7 +314,7 @@ function Clear-Any-Restart([string] $key = $global:restartKey) {
     }
 }
 function Restart-And-Resume([string] $parameters) {
-    Restart-And-Run $global:restartKey "$global:powershell $global:scriptFullPath `"-Restarted $parameters`""
+    Restart-And-Run $global:restartKey "$global:powershell -Command `"$global:scriptFullPath -Restarted $parameters`""
 }
 # END - RESTART AND RESUME SCRIPT FUNCTIONS - END
 
@@ -287,7 +423,7 @@ function Open-As-Admin {
     )
 	
     if ($Arguments) {
-		
+        $Arguments = $Arguments.Split(" ")
         Start-Process -FilePath "C:\Program Files\PowerShell\7\pwsh.exe" -ArgumentList "-ExecutionPolicy", "Bypass", "-File", "$global:scriptFullPath", $Arguments -Verb RunAs
     }
     else {
@@ -389,19 +525,29 @@ function Test-ValidIP {
 
 	.PARAMETER IP
 	Specify the IP to check
+    
+    .PARAMETER NoExit
+	Return values or throw error
 
 	.EXAMPLE
 	Test-ValidIP -IP "192.168.5.2"
 	#>
 
     param (
-        [String]$IP
+        [String]$IP,
+        [Switch]$NoExit
     )
 
     try {
         [ipaddress] $IP | Out-Null
+        if ($NoExit) {
+            return 1
+        }
     }
     catch [System.InvalidCastException] {
+        if ($NoExit) {
+            return 0
+        }
         throw "Not a valid IP"
     }
 }
@@ -548,6 +694,7 @@ function Get-ScriptUpdate {
 	.EXAMPLE
 	Get-ScriptUpdate
 	#>
+    return
     $url = "https://raw.githubusercontent.com/Kiu1812/SystemTweaker/main/LATEST"
 	
     $response = Invoke-RestMethod -Uri $url
@@ -637,7 +784,7 @@ function Set-Hostname () {
     if ($?) {
         Write-Host "The computer will reboot with the new hostname $NewName"
         Wait-PressKey
-        Restart-And-Resume "-NewComputerName $NewName"
+        Restart-And-Resume "-SetHostname -Hostname $NewName"
     }
     else {
         Throw "Some error has occurred. Please try again"
@@ -729,10 +876,15 @@ function Set-IP-Dialog {
 
     Test-ValidIPAddressWithCIDR -IP $NewIP -CIDR $NewCIDR
     $NewGateway = Get-Gateway -IP $NewIP -CIDR $NewCIDR
-    $NewGatewayPrompt = Read-Host -Prompt "New Gateway [$NewGateway]"
+    $NewGatewayPrompt = Read-Host -Prompt "New Gateway {any non IP value to set (empty)} [$NewGateway]"
     if (-not([string]::IsNullOrEmpty($NewGatewayPrompt))) {
-        Test-ValidIP -IP $NewGatewayPrompt
-        $NewGateway = $NewGatewayPrompt
+        if ((Test-ValidIP -IP $NewGatewayPrompt -NoExit) -eq 0) {
+            $NewGateway = "(empty)"
+            Write-Host "Using (empty) Gateway"
+        }
+        else {
+            $NewGateway = $NewGatewayPrompt
+        }
     }
     $InterfaceIndex = (Get-CimInstance -ClassName Win32_NetworkAdapter | Where-Object { $_.NetConnectionId -eq $NetworkAdapter.Connection_ID } | Select-Object InterfaceIndex).InterfaceIndex
     
@@ -762,8 +914,7 @@ function Set-IP-Dialog {
         Set-IP -IP $NewIP -CIDR $NewCIDR -Gateway $NewGateway -InterfaceIndex $InterfaceIndex
     }
 
-
-	<#
+    <#
     Write-Host ""
     Write-Host "The new configuration is:"
     [PSCustomObject]@{
@@ -774,7 +925,7 @@ function Set-IP-Dialog {
         MAIN_DNS      = $NewDNSServerAddresses[0]
         SECONDARY_DNS = $NewDNSServerAddresses[1]
     } | Format-Table -AutoSize
-	#>
+    #>
 }
 
 function Set-IP () {
@@ -840,12 +991,23 @@ function Set-IP () {
         throw "Interface not found"
     }
 
+    Test-ValidIP -IP $IP
+    Test-ValidCIDR -CIDR $CIDR
+    Test-ValidIPAddressWithCIDR -IP $IP -CIDR $CIDR
+
+
     # Remove Old IP and Gateway before setting the new
     Remove-NetIPAddress -InterfaceIndex $InterfaceIndex -Confirm:$false
-    Remove-NetRoute -InterfaceIndex $InterfaceIndex -Confirm:$false
+    Remove-NetRoute -InterfaceIndex $InterfaceIndex -Confirm:$false 2>$null
     
     Start-Sleep -Seconds 1
-    New-NetIPAddress -IPAddress $NewIP -PrefixLength $NewCIDR -DefaultGateway $NewGateway -InterfaceIndex $InterfaceIndex | Out-Null
+    if ($Gateway -ne "(empty)") {
+        Test-ValidIP -IP $Gateway
+        New-NetIPAddress -IPAddress $IP -PrefixLength $CIDR -DefaultGateway $Gateway -InterfaceIndex $InterfaceIndex | Out-Null
+    }
+    else {
+        New-NetIPAddress -IPAddress $IP -PrefixLength $CIDR -InterfaceIndex $InterfaceIndex | Out-Null
+    }
     
     if ($DNSServers -and ($DNSServers.Length -le 2)) {
         foreach ($DNSIP in $DNSServers) {
@@ -855,7 +1017,7 @@ function Set-IP () {
     }
     else {
         Set-DnsClientServerAddress -InterfaceIndex $InterfaceIndex -ResetServerAddresses
-		$DNSServers = @("", "")
+        $DNSServers = @("(empty)", "(empty)")
     }
 
     Write-Host ""
@@ -867,6 +1029,8 @@ function Set-IP () {
         MAIN_DNS      = $DNSServers[0]
         SECONDARY_DNS = $DNSServers[1]
     } | Format-Table -AutoSize
+
+    Exit-PressKey
 }
 # END FEATURE - SET IP - FEATURE END
 
@@ -903,19 +1067,32 @@ function Open-UserMenu {
 function Main {
     [CmdletBinding()]
     param( 
-        [String[]]$ScriptArgs
+        [String]$ScriptArgs
     )
-    clear
+    #clear
     ParseArguments -ScriptArgs $ScriptArgs
     Get-ScriptUpdate
 
-    if (-not($global:Restarted)) {
+    if (-not($Restarted)) {    
         Open-UserMenu
     }
 }
 # END - MAIN - END
 
-Main -ScriptArgs $args
+$arguments = @()
+foreach ($key in $MyInvocation.BoundParameters.Keys) {
+    $value = $MyInvocation.BoundParameters[$key]
+    
+    if ($value -eq $True) {
+        # ONLY ADD VALUE IF IS NOT A SWITCH PARAMETER
+        $arguments += "-$key"    
+    }
+    else {
+        $arguments += "-$key $($MyInvocation.BoundParameters[$key])"
+    }
+}
+$arguments = $arguments -join " "
+Main -ScriptArgs $arguments
 
 # END_FILE - main.ps1 - END_FILE
 
