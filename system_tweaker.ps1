@@ -139,7 +139,7 @@ function ParseArguments {
 # START_FILE - global_vars.ps1 - START_FILE
 
 # START - GLOBAL VARIABLES - START
-$global:CURRENT_VERSION = "v0.2.5-beta"
+$global:CURRENT_VERSION = "v0.2.6-beta"
 $global:scriptName = $MyInvocation.MyCommand.Name
 
 # START - RESTART AND RESUME VARIABLES - START
@@ -756,13 +756,14 @@ function Set-IP-Dialog {
         }
 
         $NewDNSServerAddresses = @($NewMainDNS, $NewSecondaryDNS)
-        Set-IP -IP $NewIP -CIDR $NewCIDR -Gateway $NewGateway -InterfaceName $InterfaceIndex -DNSServers $NewDNSServerAddresses
+        Set-IP -IP $NewIP -CIDR $NewCIDR -Gateway $NewGateway -InterfaceIndex $InterfaceIndex -DNSServers $NewDNSServerAddresses
     }
     else {
-        Set-IP -IP $NewIP -CIDR $NewCIDR -Gateway $NewGateway -InterfaceName $InterfaceIndex
+        Set-IP -IP $NewIP -CIDR $NewCIDR -Gateway $NewGateway -InterfaceIndex $InterfaceIndex
     }
 
 
+	<#
     Write-Host ""
     Write-Host "The new configuration is:"
     [PSCustomObject]@{
@@ -773,6 +774,7 @@ function Set-IP-Dialog {
         MAIN_DNS      = $NewDNSServerAddresses[0]
         SECONDARY_DNS = $NewDNSServerAddresses[1]
     } | Format-Table -AutoSize
+	#>
 }
 
 function Set-IP () {
@@ -853,6 +855,7 @@ function Set-IP () {
     }
     else {
         Set-DnsClientServerAddress -InterfaceIndex $InterfaceIndex -ResetServerAddresses
+		$DNSServers = @("", "")
     }
 
     Write-Host ""
