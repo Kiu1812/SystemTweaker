@@ -10,7 +10,7 @@ Script with System utilities for Windows machines designed to enhance system con
 .NOTES
 File Name : system_tweaker.ps1
 Author : Kiu1812
-Version : v0.2.5-beta
+Version : v0.2.7-beta
 IMPORTANT: Some parameters are for internal use only and should not be used directly by users.
 
 .PARAMETER Restarted
@@ -275,7 +275,7 @@ function ParseArguments {
 # START_FILE - global_vars.ps1 - START_FILE
 
 # START - GLOBAL VARIABLES - START
-$global:CURRENT_VERSION = "v0.2.5-beta"
+$global:CURRENT_VERSION = "v0.2.7-beta"
 $global:scriptName = $MyInvocation.MyCommand.Name
 
 # START - RESTART AND RESUME VARIABLES - START
