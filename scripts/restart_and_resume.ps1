@@ -22,6 +22,6 @@ function Clear-Any-Restart([string] $key = $global:restartKey) {
     }
 }
 function Restart-And-Resume([string] $parameters) {
-    Restart-And-Run $global:restartKey "$global:powershell $global:scriptFullPath `"-Restarted $parameters`""
+    Restart-And-Run $global:restartKey "$global:powershell -Command `"$global:scriptFullPath -Restarted $parameters`""
 }
 # END - RESTART AND RESUME SCRIPT FUNCTIONS - END

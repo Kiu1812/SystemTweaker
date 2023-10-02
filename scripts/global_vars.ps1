@@ -1,5 +1,5 @@
 # START - GLOBAL VARIABLES - START
-$global:CURRENT_VERSION = "v0.2.5-beta"
+$global:CURRENT_VERSION = "v0.2.7-beta"
 $global:scriptName = $MyInvocation.MyCommand.Name
 
 # START - RESTART AND RESUME VARIABLES - START

@@ -78,10 +78,15 @@ function Set-IP-Dialog {
 
     Test-ValidIPAddressWithCIDR -IP $NewIP -CIDR $NewCIDR
     $NewGateway = Get-Gateway -IP $NewIP -CIDR $NewCIDR
-    $NewGatewayPrompt = Read-Host -Prompt "New Gateway [$NewGateway]"
+    $NewGatewayPrompt = Read-Host -Prompt "New Gateway {any non IP value to set (empty)} [$NewGateway]"
     if (-not([string]::IsNullOrEmpty($NewGatewayPrompt))) {
-        Test-ValidIP -IP $NewGatewayPrompt
-        $NewGateway = $NewGatewayPrompt
+        if ((Test-ValidIP -IP $NewGatewayPrompt -NoExit) -eq 0) {
+            $NewGateway = "(empty)"
+            Write-Host "Using (empty) Gateway"
+        }
+        else {
+            $NewGateway = $NewGatewayPrompt
+        }
     }
     $InterfaceIndex = (Get-CimInstance -ClassName Win32_NetworkAdapter | Where-Object { $_.NetConnectionId -eq $NetworkAdapter.Connection_ID } | Select-Object InterfaceIndex).InterfaceIndex
     
@@ -105,13 +110,13 @@ function Set-IP-Dialog {
         }
 
         $NewDNSServerAddresses = @($NewMainDNS, $NewSecondaryDNS)
-        Set-IP -IP $NewIP -CIDR $NewCIDR -Gateway $NewGateway -InterfaceName $InterfaceIndex -DNSServers $NewDNSServerAddresses
+        Set-IP -IP $NewIP -CIDR $NewCIDR -Gateway $NewGateway -InterfaceIndex $InterfaceIndex -DNSServers $NewDNSServerAddresses
     }
     else {
-        Set-IP -IP $NewIP -CIDR $NewCIDR -Gateway $NewGateway -InterfaceName $InterfaceIndex
+        Set-IP -IP $NewIP -CIDR $NewCIDR -Gateway $NewGateway -InterfaceIndex $InterfaceIndex
     }
 
-
+    <#
     Write-Host ""
     Write-Host "The new configuration is:"
     [PSCustomObject]@{
@@ -122,6 +127,7 @@ function Set-IP-Dialog {
         MAIN_DNS      = $NewDNSServerAddresses[0]
         SECONDARY_DNS = $NewDNSServerAddresses[1]
     } | Format-Table -AutoSize
+    #>
 }
 
 function Set-IP () {
@@ -187,12 +193,23 @@ function Set-IP () {
         throw "Interface not found"
     }
 
+    Test-ValidIP -IP $IP
+    Test-ValidCIDR -CIDR $CIDR
+    Test-ValidIPAddressWithCIDR -IP $IP -CIDR $CIDR
+
+
     # Remove Old IP and Gateway before setting the new
     Remove-NetIPAddress -InterfaceIndex $InterfaceIndex -Confirm:$false
-    Remove-NetRoute -InterfaceIndex $InterfaceIndex -Confirm:$false
+    Remove-NetRoute -InterfaceIndex $InterfaceIndex -Confirm:$false 2>$null
     
     Start-Sleep -Seconds 1
-    New-NetIPAddress -IPAddress $NewIP -PrefixLength $NewCIDR -DefaultGateway $NewGateway -InterfaceIndex $InterfaceIndex | Out-Null
+    if ($Gateway -ne "(empty)") {
+        Test-ValidIP -IP $Gateway
+        New-NetIPAddress -IPAddress $IP -PrefixLength $CIDR -DefaultGateway $Gateway -InterfaceIndex $InterfaceIndex | Out-Null
+    }
+    else {
+        New-NetIPAddress -IPAddress $IP -PrefixLength $CIDR -InterfaceIndex $InterfaceIndex | Out-Null
+    }
     
     if ($DNSServers -and ($DNSServers.Length -le 2)) {
         foreach ($DNSIP in $DNSServers) {
@@ -202,6 +219,7 @@ function Set-IP () {
     }
     else {
         Set-DnsClientServerAddress -InterfaceIndex $InterfaceIndex -ResetServerAddresses
+        $DNSServers = @("(empty)", "(empty)")
     }
 
     Write-Host ""
@@ -213,5 +231,7 @@ function Set-IP () {
         MAIN_DNS      = $DNSServers[0]
         SECONDARY_DNS = $DNSServers[1]
     } | Format-Table -AutoSize
+
+    Exit-PressKey
 }
 # END FEATURE - SET IP - FEATURE END

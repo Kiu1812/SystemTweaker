@@ -60,7 +60,7 @@ function Set-Hostname () {
     if ($?) {
         Write-Host "The computer will reboot with the new hostname $NewName"
         Wait-PressKey
-        Restart-And-Resume "-NewComputerName $NewName"
+        Restart-And-Resume "-SetHostname -Hostname $NewName"
     }
     else {
         Throw "Some error has occurred. Please try again"

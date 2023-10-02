@@ -99,7 +99,7 @@ function Open-As-Admin {
     )
 	
     if ($Arguments) {
-		
+        $Arguments = $Arguments.Split(" ")
         Start-Process -FilePath "C:\Program Files\PowerShell\7\pwsh.exe" -ArgumentList "-ExecutionPolicy", "Bypass", "-File", "$global:scriptFullPath", $Arguments -Verb RunAs
     }
     else {
@@ -201,19 +201,29 @@ function Test-ValidIP {
 
 	.PARAMETER IP
 	Specify the IP to check
+    
+    .PARAMETER NoExit
+	Return values or throw error
 
 	.EXAMPLE
 	Test-ValidIP -IP "192.168.5.2"
 	#>
 
     param (
-        [String]$IP
+        [String]$IP,
+        [Switch]$NoExit
     )
 
     try {
         [ipaddress] $IP | Out-Null
+        if ($NoExit) {
+            return 1
+        }
     }
     catch [System.InvalidCastException] {
+        if ($NoExit) {
+            return 0
+        }
         throw "Not a valid IP"
     }
 }

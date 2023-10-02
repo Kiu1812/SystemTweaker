@@ -9,7 +9,7 @@ function Open-UserMenu {
 	#>
 	
 
-    $Options = @("Exit", "Set Hostname", "Set IP", "WIP Create domain", "WIP Join domain", "WIP Create Users")
+    $Options = @("Exit", "Set Hostname", "Set IP")
     $selection = Select-From-Options -Title "System Tweaker" -Options $Options
     switch ($selection) {
         0 {
@@ -27,16 +27,29 @@ function Open-UserMenu {
 function Main {
     [CmdletBinding()]
     param( 
-        [String[]]$ScriptArgs
+        [String]$ScriptArgs
     )
-    clear
+    #clear
     ParseArguments -ScriptArgs $ScriptArgs
     Get-ScriptUpdate
 
-    if (-not($global:Restarted)) {
+    if (-not($Restarted)) {    
         Open-UserMenu
     }
 }
 # END - MAIN - END
 
-Main -ScriptArgs $args
+$arguments = @()
+foreach ($key in $MyInvocation.BoundParameters.Keys) {
+    $value = $MyInvocation.BoundParameters[$key]
+    
+    if ($value -eq $True) {
+        # ONLY ADD VALUE IF IS NOT A SWITCH PARAMETER
+        $arguments += "-$key"    
+    }
+    else {
+        $arguments += "-$key $($MyInvocation.BoundParameters[$key])"
+    }
+}
+$arguments = $arguments -join " "
+Main -ScriptArgs $arguments

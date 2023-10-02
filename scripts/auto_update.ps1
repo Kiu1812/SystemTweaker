@@ -7,6 +7,7 @@ function Get-ScriptUpdate {
 	.EXAMPLE
 	Get-ScriptUpdate
 	#>
+    
     $url = "https://raw.githubusercontent.com/Kiu1812/SystemTweaker/main/LATEST"
 	
     $response = Invoke-RestMethod -Uri $url
